@@ -1,0 +1,654 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Horse Skill Planner</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <style>
+        /* CSS Variables for new theme based on screenshot */
+        :root {
+            --bg-color: #1a1a1a; /* Very dark grey / black */
+            --primary-accent: #ffd700; /* Gold */
+            --secondary-accent: #ffe55c; /* Lighter gold */
+            --text-color: #f0f0f0; /* Light grey / white */
+            --text-color-dark: #333333; /* For elements on light backgrounds */
+            --card-bg: #2c2c2c; /* Dark grey for cards/sections */
+            --border-color: #444444; /* Subtle borders */
+            --progress-bar-bg: #555555;
+            --progress-bar-fill: var(--primary-accent);
+            --button-reset-bg: #4a4a4a;
+            --border-radius: 8px;
+            --transition-speed: 0.3s;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 15px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+            box-sizing: border-box;
+        }
+
+        .container {
+            background-color: var(--card-bg);
+            padding: 20px;
+            border-radius: var(--border-radius);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+            width: 95%;
+            max-width: 900px; /* Adjusted max-width */
+            text-align: center;
+        }
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            width: 100%;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        header h1 {
+            color: var(--primary-accent);
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.5);
+            font-size: 2em;
+            margin: 0;
+        }
+        
+        .horse-info-area {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            margin-bottom: 25px;
+            padding: 15px;
+            background-color: rgba(0,0,0,0.1);
+            border-radius: var(--border-radius);
+        }
+
+        .horse-avatar {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            background-color: var(--primary-accent); /* Placeholder */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden; /* For actual image */
+        }
+        .horse-avatar i { /* For Font Awesome icon as placeholder */
+            font-size: 30px;
+            color: var(--bg-color);
+        }
+
+        .horse-name {
+            font-size: 1.5em;
+            font-weight: bold;
+            color: var(--text-color);
+        }
+
+        .reset-horse-button {
+            background-color: var(--button-reset-bg);
+            color: var(--text-color);
+            border: 1px solid var(--primary-accent);
+            padding: 8px 15px;
+            border-radius: var(--border-radius);
+            cursor: pointer;
+            font-size: 0.9em;
+            margin-left: auto; /* Pushes button to the right */
+            transition: background-color var(--transition-speed);
+        }
+        .reset-horse-button:hover {
+            background-color: var(--primary-accent);
+            color: var(--text-color-dark);
+        }
+
+        .points-summary-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 30px;
+            align-items: center;
+        }
+        
+        .skill-points-bar-container {
+            background-color: var(--progress-bar-bg);
+            border-radius: var(--border-radius);
+            padding: 5px;
+            height: 30px; /* Total height including padding */
+            display: flex;
+            align-items: center;
+            position: relative;
+        }
+        #skillPointsBar {
+            height: 100%;
+            background-color: var(--progress-bar-fill);
+            border-radius: calc(var(--border-radius) - 3px);
+            transition: width var(--transition-speed) ease-out;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .skill-points-text-overlay {
+            position: absolute;
+            left: 10px;
+            right: 10px;
+            text-align: center;
+            font-weight: bold;
+            color: var(--text-color);
+            font-size: 0.9em;
+            pointer-events: none; /* Allows clicks to pass through if needed */
+        }
+
+
+        .unallocated-points-display, .max-points-control-group {
+            background-color: transparent;
+            padding: 10px 15px;
+            border: 1px solid var(--primary-accent);
+            border-radius: var(--border-radius);
+            font-size: 0.9em;
+            font-weight: bold;
+            text-align: center;
+        }
+        .max-points-control-group {
+            display: flex;
+            flex-direction: column; /* Stack label and input */
+            align-items: center;
+            gap: 5px;
+        }
+        .max-points-control-group label {
+            font-size: 0.8em;
+            color: var(--secondary-accent);
+        }
+        .max-points-control-group input[type="number"] {
+            background-color: var(--card-bg);
+            color: var(--text-color);
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            padding: 5px;
+            width: 60px;
+            text-align: center;
+            font-size: 1em;
+        }
+        /* Hide spinner buttons for number input */
+        .max-points-control-group input[type=number]::-webkit-inner-spin-button, 
+        .max-points-control-group input[type=number]::-webkit-outer-spin-button { 
+          -webkit-appearance: none; 
+          margin: 0; 
+        }
+        .max-points-control-group input[type=number] {
+          -moz-appearance: textfield; /* Firefox */
+        }
+
+
+        .skill-category-section {
+            margin-bottom: 30px;
+        }
+
+        .skill-category-section h2 {
+            color: var(--primary-accent);
+            text-align: left;
+            font-size: 1.3em;
+            margin-bottom: 15px;
+            padding-bottom: 5px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .skills-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); /* Responsive grid */
+            gap: 20px;
+            justify-items: center;
+        }
+
+        .skill-item-card {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 10px;
+            background-color: rgba(0,0,0,0.1); /* Slightly darker than card-bg */
+            border-radius: var(--border-radius);
+            width: 110px; /* Fixed width for consistency */
+        }
+
+        .skill-main-circle {
+            width: 70px;
+            height: 70px;
+            border-radius: 50%;
+            border: 3px solid var(--border-color);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin-bottom: 8px;
+            transition: border-color var(--transition-speed);
+            cursor: default; /* Will use buttons for interaction */
+        }
+        .skill-main-circle i { /* Skill icon */
+            font-size: 28px;
+            color: var(--border-color); /* Default icon color */
+            transition: color var(--transition-speed);
+        }
+
+        .skill-item-card.active .skill-main-circle {
+            border-color: var(--primary-accent);
+        }
+        .skill-item-card.active .skill-main-circle i {
+            color: var(--primary-accent); /* Active icon color */
+        }
+
+        .skill-level-pips {
+            display: flex;
+            gap: 4px;
+            margin-bottom: 8px;
+            height: 10px; /* Ensure consistent height */
+        }
+        .pip {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background-color: var(--border-color); /* Inactive pip */
+            transition: background-color var(--transition-speed);
+        }
+        .pip.active {
+            background-color: var(--primary-accent); /* Active pip */
+        }
+
+        .skill-name-text {
+            font-size: 0.85em;
+            margin-bottom: 10px;
+            min-height: 2.5em; /* Ensure space for two lines of text */
+            text-align: center;
+        }
+
+        .skill-action-buttons {
+            display: flex;
+            gap: 8px;
+        }
+        .skill-action-buttons button {
+            background-color: var(--card-bg);
+            color: var(--primary-accent);
+            border: 1px solid var(--primary-accent);
+            border-radius: 50%; /* Circular buttons */
+            width: 30px;
+            height: 30px;
+            font-size: 1em;
+            font-weight: bold;
+            cursor: pointer;
+            transition: background-color var(--transition-speed), color var(--transition-speed);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        .skill-action-buttons button:hover:not(:disabled) {
+            background-color: var(--primary-accent);
+            color: var(--text-color-dark);
+        }
+        .skill-action-buttons button:disabled {
+            border-color: var(--border-color);
+            color: var(--border-color);
+            cursor: not-allowed;
+        }
+        
+        .skill-cost-info-text { /* This class was in old HTML, not used in screenshot style */
+            display: none; /* Hidden for this design, functionality remains in JS */
+        }
+
+        /* Responsive adjustments */
+        @media (max-width: 768px) {
+            header h1 {
+                font-size: 1.8em;
+            }
+            .horse-info-area {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+            .reset-horse-button {
+                margin-left: 0;
+                margin-top: 10px;
+                align-self: flex-start;
+            }
+            .points-summary-grid {
+                grid-template-columns: 1fr; /* Stack point displays */
+            }
+            .skills-grid {
+                grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+                gap: 15px;
+            }
+            .skill-item-card {
+                width: 100px;
+            }
+            .skill-main-circle {
+                width: 60px;
+                height: 60px;
+            }
+            .skill-main-circle i {
+                font-size: 24px;
+            }
+        }
+         @media (max-width: 480px) {
+            body { padding: 10px; }
+            .container { padding: 15px; }
+            header h1 { font-size: 1.5em; }
+            .skills-grid {
+                grid-template-columns: repeat(2, 1fr); /* Ensure at least 2 skills per row */
+                gap: 10px;
+            }
+             .skill-item-card {
+                padding: 8px;
+            }
+            .skill-name-text {
+                font-size: 0.8em;
+            }
+        }
+
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <header>
+            <h1>HORSE SKILLS</h1>
+            <i class="fas fa-bars" style="font-size: 1.5em; color: var(--primary-accent); cursor: pointer;"></i>
+        </header>
+
+        <section class="horse-info-area">
+            <div class="horse-avatar"><i class="fas fa-horse-head"></i></div>
+            <span class="horse-name">Sunshine</span>
+            <button id="resetHorseBtn" class="reset-horse-button">RESET HORSE</button>
+        </section>
+
+        <section class="points-summary-grid">
+            <div class="skill-points-bar-container">
+                <div id="skillPointsBar"></div>
+                <span id="skillPointsText" class="skill-points-text-overlay">Skill Points: 0/100</span>
+            </div>
+            <div id="unallocatedPointsDisplay" class="unallocated-points-display">
+                Unallocated points: 100
+            </div>
+             <div class="max-points-control-group">
+                <label for="maxSkillPointsInput">Set Max Points:</label>
+                <input type="number" id="maxSkillPointsInput" value="100" min="0">
+            </div>
+        </section>
+
+        <section class="skill-category-section" id="starting-skills-category">
+            <h2>STARTING SKILLS</h2>
+            <div class="skills-grid">
+                </div>
+        </section>
+
+        <section class="skill-category-section" id="racing-skills-category">
+            <h2>RACING SKILLS</h2>
+            <div class="skills-grid">
+                </div>
+        </section>
+
+        <section class="skill-category-section" id="finishing-skills-category">
+            <h2>FINISHING SKILLS</h2>
+            <div class="skills-grid">
+                </div>
+        </section>
+    </div>
+
+    <script>
+        // --- SKILL DATA AND CONFIGURATION ---
+        const skillsConfiguration = {
+            // Icons from Font Awesome (example selection)
+            starting: [
+                { id: 'firstOut', name: 'First Out', currentLevel: 0, maxLevel: 5, icon: 'fas fa-rocket' },
+                { id: 'toTheFront', name: 'To the Front', currentLevel: 0, maxLevel: 5, icon: 'fas fa-angle-double-up' },
+                { id: 'toTheRail', name: 'To the Rail', currentLevel: 0, maxLevel: 5, icon: 'fas fa-compress-arrows-alt' },
+            ],
+            racing: [
+                { id: 'breezing', name: 'Breezing', currentLevel: 0, maxLevel: 5, icon: 'fas fa-wind' },
+                { id: 'working', name: 'Working', currentLevel: 0, maxLevel: 5, icon: 'fas fa-cogs' }, // Changed from cog to cogs
+                { id: 'drafting', name: 'Drafting', currentLevel: 0, maxLevel: 5, icon: 'fas fa-users' },
+                { id: 'leadLegChange', name: 'Lead Leg Change', currentLevel: 0, maxLevel: 5, icon: 'fas fa-exchange-alt' },
+            ],
+            finishing: [
+                { id: 'dueling', name: 'Dueling', currentLevel: 0, maxLevel: 5, icon: 'fas fa-swords' }, // Using 'swords' (Font Awesome Pro) or 'fas fa-fist-raised' (Free)
+                { id: 'overtaking', name: 'Overtaking', currentLevel: 0, maxLevel: 5, icon: 'fas fa-angle-double-right' },
+                { id: 'finalKick', name: 'Final Kick', currentLevel: 0, maxLevel: 5, icon: 'fas fa-bolt' },
+                { id: 'closing', name: 'Closing', currentLevel: 0, maxLevel: 5, icon: 'fas fa-flag-checkered' },
+            ]
+        };
+
+        const pointsCostPerLevelIncrement = [1, 2, 5, 7, 10];
+        const cumulativePointsCostForLevel = [0];
+        let currentCumulativeCost = 0;
+        for (const cost of pointsCostPerLevelIncrement) {
+            currentCumulativeCost += cost;
+            cumulativePointsCostForLevel.push(currentCumulativeCost);
+        }
+
+        let currentMaxSkillPoints = 100;
+        let currentUsedSkillPoints = 0;
+
+        const maxSkillPointsInputElement = document.getElementById('maxSkillPointsInput');
+        const skillPointsTextElement = document.getElementById('skillPointsText');
+        const skillPointsBarElement = document.getElementById('skillPointsBar');
+        const unallocatedPointsDisplayElement = document.getElementById('unallocatedPointsDisplay');
+        const resetHorseButton = document.getElementById('resetHorseBtn');
+
+
+        function getSkillObjectById(skillId) {
+            for (const category in skillsConfiguration) {
+                const skill = skillsConfiguration[category].find(s => s.id === skillId);
+                if (skill) return skill;
+            }
+            return null;
+        }
+
+        function calculateTotalUsedPoints() {
+            let totalPoints = 0;
+            for (const category in skillsConfiguration) {
+                skillsConfiguration[category].forEach(skill => {
+                    totalPoints += cumulativePointsCostForLevel[skill.currentLevel];
+                });
+            }
+            return totalPoints;
+        }
+        
+        function updateSkillPointSummaryDisplays() {
+            currentUsedSkillPoints = calculateTotalUsedPoints();
+            const availablePoints = currentMaxSkillPoints - currentUsedSkillPoints;
+
+            skillPointsTextElement.textContent = `Skill Points: ${currentUsedSkillPoints}/${currentMaxSkillPoints}`;
+            const percentage = currentMaxSkillPoints > 0 ? (currentUsedSkillPoints / currentMaxSkillPoints) * 100 : 0;
+            skillPointsBarElement.style.width = `${Math.min(percentage, 100)}%`; // Cap at 100%
+
+            unallocatedPointsDisplayElement.textContent = `Unallocated points: ${availablePoints}`;
+            
+            if (availablePoints < 0) {
+                unallocatedPointsDisplayElement.style.color = '#FF6B6B'; // A light red for dark theme
+                skillPointsBarElement.style.backgroundColor = '#FF6B6B'; 
+            } else {
+                unallocatedPointsDisplayElement.style.color = ''; // Reset to default
+                skillPointsBarElement.style.backgroundColor = ''; // Reset to default
+            }
+            updateAllSkillActionButtonsState();
+        }
+
+        function getCostForNextSkillLevel(skill) {
+            if (skill.currentLevel >= skill.maxLevel) return Infinity;
+            return pointsCostPerLevelIncrement[skill.currentLevel];
+        }
+
+        function renderSingleSkill(skill) {
+            const skillElement = document.getElementById(`skill-item-${skill.id}`);
+            if (!skillElement) return;
+
+            const mainCircleIcon = skillElement.querySelector('.skill-main-circle i');
+            const pips = skillElement.querySelectorAll('.pip');
+
+            // Update main circle and icon
+            if (skill.currentLevel > 0) {
+                skillElement.classList.add('active');
+                mainCircleIcon.className = skill.icon; // Set specific skill icon
+            } else {
+                skillElement.classList.remove('active');
+                mainCircleIcon.className = 'fas fa-plus'; // Set '+' icon for level 0
+            }
+
+            // Update pips
+            pips.forEach((pip, index) => {
+                if (index < skill.currentLevel) {
+                    pip.classList.add('active');
+                } else {
+                    pip.classList.remove('active');
+                }
+            });
+            updateSkillActionButtonsState(skill);
+        }
+
+        function updateSkillActionButtonsState(skill) {
+            const skillElement = document.getElementById(`skill-item-${skill.id}`);
+            if (!skillElement) return;
+
+            const increaseButton = skillElement.querySelector('.increase-skill-button');
+            const decreaseButton = skillElement.querySelector('.decrease-skill-button');
+            
+            decreaseButton.disabled = skill.currentLevel <= 0;
+
+            const costForNextLevel = getCostForNextSkillLevel(skill);
+            const availablePoints = currentMaxSkillPoints - currentUsedSkillPoints;
+
+            if (skill.currentLevel >= skill.maxLevel || availablePoints < costForNextLevel) {
+                increaseButton.disabled = true;
+            } else {
+                increaseButton.disabled = false;
+            }
+        }
+
+        function updateAllSkillActionButtonsState() {
+            for (const category in skillsConfiguration) {
+                skillsConfiguration[category].forEach(skill => {
+                    updateSkillActionButtonsState(skill);
+                });
+            }
+        }
+
+        function handleIncreaseSkillLevel(skillId) {
+            const skill = getSkillObjectById(skillId);
+            if (!skill || skill.currentLevel >= skill.maxLevel) return;
+
+            const costToUpgrade = getCostForNextSkillLevel(skill);
+            const availablePoints = currentMaxSkillPoints - currentUsedSkillPoints;
+
+            if (availablePoints >= costToUpgrade) {
+                skill.currentLevel++;
+                updateSkillPointSummaryDisplays();
+                renderSingleSkill(skill);
+            }
+        }
+
+        function handleDecreaseSkillLevel(skillId) {
+            const skill = getSkillObjectById(skillId);
+            if (!skill || skill.currentLevel <= 0) return;
+
+            skill.currentLevel--;
+            updateSkillPointSummaryDisplays();
+            renderSingleSkill(skill);
+        }
+
+        function handleMaxSkillPointsChange(event) {
+            let newMaxValue = parseInt(event.target.value, 10);
+            if (isNaN(newMaxValue) || newMaxValue < 0) {
+                newMaxValue = 0;
+                maxSkillPointsInputElement.value = 0;
+            }
+            currentMaxSkillPoints = newMaxValue;
+            updateSkillPointSummaryDisplays();
+        }
+        
+        function handleResetHorse() {
+            console.log("Reset Horse button clicked. Functionality to be implemented.");
+            // Basic reset: set all skill levels to 0 and update display
+            for (const category in skillsConfiguration) {
+                skillsConfiguration[category].forEach(skill => {
+                    skill.currentLevel = 0;
+                });
+            }
+            currentMaxSkillPoints = 100; // Optionally reset max points too, or keep user's value
+            maxSkillPointsInputElement.value = currentMaxSkillPoints;
+            updateSkillPointSummaryDisplays();
+            // Re-render all skills to reflect the reset state
+            for (const category in skillsConfiguration) {
+                skillsConfiguration[category].forEach(skill => {
+                    renderSingleSkill(skill);
+                });
+            }
+        }
+
+
+        function createSkillDisplayElement(skill) {
+            const skillItemCard = document.createElement('div');
+            skillItemCard.classList.add('skill-item-card');
+            skillItemCard.id = `skill-item-${skill.id}`;
+
+            let pipsHtmlContent = '';
+            for (let i = 0; i < skill.maxLevel; i++) {
+                pipsHtmlContent += `<div class="pip"></div>`;
+            }
+
+            // Initial icon is '+' if level 0, otherwise the skill's icon
+            const initialIconClass = skill.currentLevel > 0 ? skill.icon : 'fas fa-plus';
+            if (skill.currentLevel > 0) skillItemCard.classList.add('active');
+
+
+            skillItemCard.innerHTML = `
+                <div class="skill-main-circle">
+                    <i class="${initialIconClass}"></i>
+                </div>
+                <div class="skill-level-pips">
+                    ${pipsHtmlContent}
+                </div>
+                <div class="skill-name-text">${skill.name}</div>
+                <div class="skill-action-buttons">
+                    <button class="decrease-skill-button" aria-label="Decrease ${skill.name} level">-</button>
+                    <button class="increase-skill-button" aria-label="Increase ${skill.name} level">+</button>
+                </div>
+                <div class="skill-cost-info-text"></div> `;
+
+            skillItemCard.querySelector('.increase-skill-button').addEventListener('click', () => handleIncreaseSkillLevel(skill.id));
+            skillItemCard.querySelector('.decrease-skill-button').addEventListener('click', () => handleDecreaseSkillLevel(skill.id));
+            
+            return skillItemCard;
+        }
+
+        function initializeSkillPlanner() {
+            for (const categoryKey in skillsConfiguration) {
+                const categorySection = document.getElementById(`${categoryKey}-skills-category`);
+                const skillsGrid = categorySection.querySelector('.skills-grid');
+                
+                if (skillsGrid) {
+                    skillsConfiguration[categoryKey].forEach(skill => {
+                        const skillElement = createSkillDisplayElement(skill);
+                        skillsGrid.appendChild(skillElement);
+                        renderSingleSkill(skill);
+                    });
+                } else {
+                    console.error("Skills grid container not found for category:", categoryKey);
+                }
+            }
+            maxSkillPointsInputElement.value = currentMaxSkillPoints;
+            updateSkillPointSummaryDisplays();
+        }
+
+        maxSkillPointsInputElement.addEventListener('change', handleMaxSkillPointsChange);
+        maxSkillPointsInputElement.addEventListener('input', (event) => {
+            if (event.target.value === "" || event.target.value === "-") return;
+            handleMaxSkillPointsChange(event);
+        });
+        resetHorseButton.addEventListener('click', handleResetHorse);
+
+        document.addEventListener('DOMContentLoaded', initializeSkillPlanner);
+    </script>
+</body>
+</html>
