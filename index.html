@@ -22,6 +22,7 @@
             --transition-speed: 0.3s;
             --ring-inactive-color: var(--border-color);
             --ring-active-color: var(--primary-accent);
+            --ring-changed-color: #ff9800; /* Orange for unsaved changes */
             --ring-outer-radius: 35px;
             --ring-inner-radius: 25px;
             --ring-thickness: calc(var(--ring-outer-radius) - var(--ring-inner-radius));
@@ -357,6 +358,10 @@
         
         .ring-segment.active {
             fill: var(--ring-active-color);
+        }
+        
+        .ring-segment.changed {
+            fill: var(--ring-changed-color);
         }
 
         .skill-main-circle {
@@ -980,6 +985,20 @@
         .welcome-cta-button:hover {
             background-color: var(--secondary-accent);
         }
+
+        /* Add to save button style to show when there are unsaved changes */
+        .horse-menu-button.save-needed {
+            background-color: var(--ring-changed-color);
+            color: var(--text-color-dark);
+            border-color: var(--ring-changed-color);
+            animation: pulse 1.5s infinite;
+        }
+        
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.7; }
+            100% { opacity: 1; }
+        }
     </style>
 </head>
 <body>
@@ -1291,6 +1310,10 @@
                 });
             }
             
+            // Update saved state reference before rendering skills
+            // This ensures the saved state matches what we just loaded
+            savedSkillState = JSON.parse(JSON.stringify(horseState));
+            
             // Update all displays
             updateSkillPointSummaryDisplays();
             
@@ -1300,6 +1323,10 @@
                     renderSingleSkill(skill);
                 });
             }
+            
+            // Remove save-needed class
+            saveHorseButton.classList.remove('save-needed');
+            hasUnsavedChanges = false;
             
             // Save this horse as the last loaded horse
             saveLastLoadedHorseId(horseState.id);
@@ -1341,6 +1368,9 @@
             
             // Automatically save the horse to localStorage
             const savedHorse = saveCurrentHorse();
+            
+            // Update saved state reference
+            updateSavedSkillState();
             
             // Show toast notification
             showToast(`New horse "${name}" created and saved!`, 'success');
@@ -1684,15 +1714,40 @@
                 mainCircleIcon.className = 'fas fa-plus'; // Set '+' icon for level 0
             }
 
-            // Update ring segments
+            // Find saved level for this skill
+            let savedLevel = 0;
+            
+            if (savedSkillState && savedSkillState.skills) {
+                for (const category in savedSkillState.skills) {
+                    if (Array.isArray(savedSkillState.skills[category])) {
+                        const savedSkill = savedSkillState.skills[category].find(s => s.id === skill.id);
+                        if (savedSkill) {
+                            savedLevel = savedSkill.currentLevel || 0;
+                            break;
+                        }
+                    }
+                }
+            }
+
+            // Update ring segments with saved vs changed state
             ringSegments.forEach((segment, index) => {
                 // Get the segment index from the data attribute
                 const segmentIndex = parseInt(segment.getAttribute('data-segment-index') || index);
                 
+                segment.classList.remove('active', 'changed');
+                
                 if (segmentIndex < skill.currentLevel) {
-                    segment.classList.add('active');
-                } else {
-                    segment.classList.remove('active');
+                    // Segment should be active (either saved or changed)
+                    if (segmentIndex < savedLevel) {
+                        // This level was in the saved state
+                        segment.classList.add('active');
+                    } else {
+                        // This level is new/unsaved
+                        segment.classList.add('changed');
+                    }
+                } else if (segmentIndex < savedLevel) {
+                    // This was active in saved state but has been removed
+                    // Could add a different visual indicator here if desired
                 }
             });
             
@@ -1739,7 +1794,7 @@
                 renderSingleSkill(skill);
                 
                 // Auto-save horse after skill change
-                autoSaveHorse();
+                // Removed auto-save for skill changes
             }
         }
 
@@ -1752,7 +1807,7 @@
             renderSingleSkill(skill);
             
             // Auto-save horse after skill change
-            autoSaveHorse();
+            // Removed auto-save for skill changes
         }
 
         function handleMaxSkillPointsChange(event) {
@@ -1832,8 +1887,8 @@
                     });
                 }
                 
-                // Auto-save horse after reset
-                autoSaveHorse();
+                // Check for unsaved changes
+                checkForUnsavedChanges();
                 
                 // Show toast notification
                 showToast(`All skills for "${currentHorseName}" have been reset!`, 'warning');
@@ -1974,6 +2029,28 @@
             }
             maxSkillPointsInputElement.value = currentMaxSkillPoints;
             updateSkillPointSummaryDisplays();
+            
+            // Make sure we have a proper saved state structure even if it's empty
+            if (!savedSkillState || Object.keys(savedSkillState).length === 0) {
+                savedSkillState = {
+                    id: currentHorseId || generateHorseId(),
+                    name: currentHorseName,
+                    maxSkillPoints: currentMaxSkillPoints,
+                    skills: {
+                        starting: [],
+                        racing: [],
+                        finishing: []
+                    }
+                };
+                
+                // Populate the structure with skill IDs and zero levels
+                for (const category in skillsConfiguration) {
+                    savedSkillState.skills[category] = skillsConfiguration[category].map(skill => ({
+                        id: skill.id,
+                        currentLevel: 0
+                    }));
+                }
+            }
         }
 
         // ------ EVENT LISTENERS ------
@@ -2068,10 +2145,13 @@
         resetHorseButton.addEventListener('click', handleResetHorse);
 
         document.addEventListener('DOMContentLoaded', () => {
+            // Initialize the skill planner UI
             initializeSkillPlanner();
             
             // Set initial max points display value
             maxPointsValueElement.textContent = currentMaxSkillPoints;
+            
+            let horseLoaded = false;
             
             // Try to load the last active horse if available
             const lastLoadedHorseId = getLastLoadedHorseId();
@@ -2080,6 +2160,7 @@
             if (lastLoadedHorseId && savedHorses[lastLoadedHorseId]) {
                 // Load the last active horse
                 loadHorseState(savedHorses[lastLoadedHorseId]);
+                horseLoaded = true;
             } else {
                 // Otherwise, load the most recently modified horse
                 const horseIds = Object.keys(savedHorses);
@@ -2099,6 +2180,20 @@
                     
                     // Load the most recent horse
                     loadHorseState(savedHorses[mostRecentHorseId]);
+                    horseLoaded = true;
+                } 
+            }
+            
+            // If no horse was loaded, ensure we still have a clean state
+            if (!horseLoaded) {
+                // Create a clean saved state that matches the current zero state
+                updateSavedSkillState();
+                
+                // Force re-render all skills to reflect correct state
+                for (const category in skillsConfiguration) {
+                    skillsConfiguration[category].forEach(skill => {
+                        renderSingleSkill(skill);
+                    });
                 }
             }
             
@@ -2132,6 +2227,313 @@
                 return currentHorse;
             }
             return null;
+        }
+
+        // Add a variable to track saved state
+        let savedSkillState = {};
+        let hasUnsavedChanges = false;
+
+        // Function to check for unsaved changes and update UI
+        function checkForUnsavedChanges() {
+            const currentState = getCurrentHorseState();
+            let changesDetected = false;
+            
+            // Check if there's a saved state to compare against
+            if (savedSkillState && Object.keys(savedSkillState).length > 0) {
+                // Check for different name or max points
+                if (currentState.name !== savedSkillState.name || 
+                    currentState.maxSkillPoints !== savedSkillState.maxSkillPoints) {
+                    changesDetected = true;
+                } else {
+                    // Check each skill category and level
+                    for (const category in currentState.skills) {
+                        if (savedSkillState.skills && savedSkillState.skills[category]) {
+                            currentState.skills[category].forEach((skill, index) => {
+                                if (savedSkillState.skills[category][index] && 
+                                    skill.currentLevel !== savedSkillState.skills[category][index].currentLevel) {
+                                    changesDetected = true;
+                                }
+                            });
+                        } else {
+                            // Category exists in current state but not in saved state
+                            changesDetected = true;
+                        }
+                    }
+                }
+            } else {
+                // No saved state means we have unsaved changes if we have any skills
+                const hasAnySkillPoints = Object.values(currentState.skills).some(category => 
+                    category.some(skill => skill.currentLevel > 0)
+                );
+                changesDetected = hasAnySkillPoints;
+            }
+            
+            hasUnsavedChanges = changesDetected;
+            
+            // Update save button appearance
+            if (changesDetected) {
+                saveHorseButton.classList.add('save-needed');
+            } else {
+                saveHorseButton.classList.remove('save-needed');
+            }
+            
+            return changesDetected;
+        }
+        
+        // Function to update the saved state reference
+        function updateSavedSkillState() {
+            savedSkillState = JSON.parse(JSON.stringify(getCurrentHorseState()));
+            hasUnsavedChanges = false;
+            saveHorseButton.classList.remove('save-needed');
+        }
+        
+        // Modify the save function to update the saved state
+        function saveCurrentHorse() {
+            const horses = getSavedHorses();
+            const currentHorse = getCurrentHorseState();
+            
+            // Add or update horse in the collection
+            horses[currentHorse.id] = currentHorse;
+            
+            // Save to local storage
+            saveHorsesToStorage(horses);
+            
+            // Update current horse ID
+            currentHorseId = currentHorse.id;
+            
+            // Save as last loaded horse
+            saveLastLoadedHorseId(currentHorse.id);
+            
+            // Update saved state reference
+            updateSavedSkillState();
+            
+            // Remove save-needed class
+            saveHorseButton.classList.remove('save-needed');
+            hasUnsavedChanges = false;
+            
+            // Re-render all skills to show saved state
+            for (const category in skillsConfiguration) {
+                skillsConfiguration[category].forEach(skill => {
+                    renderSingleSkill(skill);
+                });
+            }
+            
+            return currentHorse;
+        }
+        
+        // Modify auto-save to update the saved state
+        function autoSaveHorse() {
+            if (currentHorseId) {
+                const horses = getSavedHorses();
+                const currentHorse = getCurrentHorseState();
+                
+                // Add or update horse in the collection
+                horses[currentHorse.id] = currentHorse;
+                
+                // Save to local storage
+                saveHorsesToStorage(horses);
+                
+                // Save as last loaded horse
+                saveLastLoadedHorseId(currentHorse.id);
+                
+                // Update saved state reference
+                updateSavedSkillState();
+                
+                // Remove save-needed class
+                saveHorseButton.classList.remove('save-needed');
+                hasUnsavedChanges = false;
+                
+                // Re-render all skills to show saved state
+                for (const category in skillsConfiguration) {
+                    skillsConfiguration[category].forEach(skill => {
+                        renderSingleSkill(skill);
+                    });
+                }
+                
+                return currentHorse;
+            }
+            return null;
+        }
+        
+        // Modify the loadHorseState function to also update saved state
+        function loadHorseState(horseState) {
+            // Set basic properties
+            currentHorseId = horseState.id;
+            currentHorseName = horseState.name;
+            currentMaxSkillPoints = horseState.maxSkillPoints || 100;
+            
+            // Update UI
+            horseNameElement.textContent = currentHorseName;
+            maxSkillPointsInputElement.value = currentMaxSkillPoints;
+            maxPointsValueElement.textContent = currentMaxSkillPoints;
+            
+            // Reset all skills to 0 first
+            for (const category in skillsConfiguration) {
+                skillsConfiguration[category].forEach(skill => {
+                    skill.currentLevel = 0;
+                });
+            }
+            
+            // Load skills from saved state
+            for (const category in horseState.skills) {
+                horseState.skills[category].forEach(savedSkill => {
+                    const skill = getSkillObjectById(savedSkill.id);
+                    if (skill) {
+                        skill.currentLevel = savedSkill.currentLevel;
+                    }
+                });
+            }
+            
+            // Update all displays
+            updateSkillPointSummaryDisplays();
+            
+            // Re-render all skills
+            for (const category in skillsConfiguration) {
+                skillsConfiguration[category].forEach(skill => {
+                    renderSingleSkill(skill);
+                });
+            }
+            
+            // Update saved state reference
+            updateSavedSkillState();
+            
+            // Remove save-needed class
+            saveHorseButton.classList.remove('save-needed');
+            hasUnsavedChanges = false;
+            
+            // Save this horse as the last loaded horse
+            saveLastLoadedHorseId(horseState.id);
+            
+            // Show toast notification
+            showToast(`"${horseState.name}" loaded successfully!`, 'info');
+        }
+        
+        // Modify the createNewHorse to update saved state
+        function createNewHorse(name = "New Horse") {
+            // Reset all skills to 0
+            for (const category in skillsConfiguration) {
+                skillsConfiguration[category].forEach(skill => {
+                    skill.currentLevel = 0;
+                });
+            }
+            
+            // Set new horse properties
+            currentHorseId = generateHorseId();
+            currentHorseName = name;
+            currentMaxSkillPoints = 100;
+            
+            // Update UI
+            horseNameElement.textContent = currentHorseName;
+            maxSkillPointsInputElement.value = currentMaxSkillPoints;
+            
+            // Update displays
+            updateSkillPointSummaryDisplays();
+            
+            // Re-render all skills
+            for (const category in skillsConfiguration) {
+                skillsConfiguration[category].forEach(skill => {
+                    renderSingleSkill(skill);
+                });
+            }
+            
+            // Save as last loaded horse
+            saveLastLoadedHorseId(currentHorseId);
+            
+            // Automatically save the horse to localStorage
+            const savedHorse = saveCurrentHorse();
+            
+            // Update saved state reference
+            updateSavedSkillState();
+            
+            // Show toast notification
+            showToast(`New horse "${name}" created and saved!`, 'success');
+        }
+        
+        // Update handleIncreaseSkillLevel to check for unsaved changes
+        function handleIncreaseSkillLevel(skillId) {
+            const skill = getSkillObjectById(skillId);
+            if (!skill || skill.currentLevel >= skill.maxLevel) return;
+
+            const costToUpgrade = getCostForNextSkillLevel(skill);
+            const availablePoints = currentMaxSkillPoints - currentUsedSkillPoints;
+
+            if (availablePoints >= costToUpgrade) {
+                skill.currentLevel++;
+                updateSkillPointSummaryDisplays();
+                renderSingleSkill(skill);
+                
+                // Check for unsaved changes
+                checkForUnsavedChanges();
+            }
+        }
+
+        // Update handleDecreaseSkillLevel to check for unsaved changes
+        function handleDecreaseSkillLevel(skillId) {
+            const skill = getSkillObjectById(skillId);
+            if (!skill || skill.currentLevel <= 0) return;
+
+            skill.currentLevel--;
+            updateSkillPointSummaryDisplays();
+            renderSingleSkill(skill);
+            
+            // Check for unsaved changes
+            checkForUnsavedChanges();
+        }
+        
+        // Update confirmNameEdit to check for unsaved changes
+        function confirmNameEdit() {
+            const nameInput = document.getElementById('inlineNameInput');
+            const newName = nameInput.value.trim();
+            
+            if (newName) {
+                const oldName = currentHorseName;
+                currentHorseName = newName;
+                horseNameElement.textContent = newName;
+                
+                // Show toast if name actually changed
+                if (oldName !== newName) {
+                    showToast(`Horse renamed to "${newName}"!`, 'info');
+                    
+                    // Auto-save horse after name change
+                    autoSaveHorse();
+                }
+            }
+            
+            // Hide editor, show name and button
+            document.querySelector('.inline-name-editor').style.display = 'none';
+            horseNameElement.style.display = '';
+            editNameButton.style.display = '';
+            
+            // Check for unsaved changes
+            checkForUnsavedChanges();
+        }
+        
+        // Update confirmMaxPointsEdit to check for unsaved changes
+        function confirmMaxPointsEdit() {
+            const newMaxValue = parseInt(maxSkillPointsInputElement.value, 10);
+            if (!isNaN(newMaxValue) && newMaxValue >= 0) {
+                // Update the max points value if valid
+                const oldMaxValue = currentMaxSkillPoints;
+                currentMaxSkillPoints = newMaxValue;
+                
+                // Update the display value
+                maxPointsValueElement.textContent = newMaxValue;
+                
+                // Show toast if the value changed
+                if (oldMaxValue !== newMaxValue) {
+                    updateSkillPointSummaryDisplays();
+                    showToast(`Max skill points updated to ${newMaxValue}!`, 'info');
+                    
+                    // Auto-save horse after max points change
+                    autoSaveHorse();
+                }
+            }
+            
+            // Hide editor, show display
+            hideMaxPointsEditor();
+            
+            // Check for unsaved changes
+            checkForUnsavedChanges();
         }
     </script>
 </body>
